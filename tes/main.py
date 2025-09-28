@@ -211,7 +211,45 @@ class AudioSteganography:
         available_bytes = available_bits // 8
         
         return max(0, available_bytes)
-    
+    def _extract_bits_random(self, n_lsb: int, start_sample: int, n_bits: int, seed_string: str) -> list[int]:
+        """Ekstraksi bit dari audio menggunakan posisi acak"""
+        if self.audio_data is None:
+            raise ValueError("Audio data tidak dimuat")
+        
+        total_samples = self.audio_data.size
+        
+        # Flatten audio
+        if self.channels == 2:
+            flat_audio = self.audio_data.flatten()
+        else:
+            flat_audio = self.audio_data
+        
+        # Generator posisi acak
+        pos_gen = RandomPositionGenerator(seed_string, total_samples)
+        all_positions = pos_gen.generate_positions(total_samples)
+        
+        # Ambil posisi setelah header (start_sample)
+        data_positions = [pos for pos in all_positions if pos >= start_sample]
+        
+        # Hitung jumlah sampel yang diperlukan
+        required_samples = (n_bits + n_lsb - 1) // n_lsb
+        data_positions = data_positions[:required_samples]
+        
+        extracted_bits = []
+        for sample_pos in data_positions:
+            if len(extracted_bits) >= n_bits:
+                break
+            
+            sample = int(flat_audio[sample_pos])
+            bits_value = sample & ((1 << n_lsb) - 1)
+            
+            for i in range(n_lsb):
+                if len(extracted_bits) >= n_bits:
+                    break
+                extracted_bits.append((bits_value >> i) & 1)
+        
+        return extracted_bits
+
     def _extract_bits_sequential(self, n_lsb: int, start_sample: int, num_bits: int) -> List[int]:
         """Ekstrak bits secara berurutan mulai dari sample tertentu (FIXED)"""
         if self.audio_data is None:
@@ -544,9 +582,8 @@ class AudioSteganography:
             print(f"✓ Memulai ekstraksi data dari sample {data_start_sample} dengan n_lsb={n_lsb}")
             
             if use_random:
-                print("⚠ Peringatan: Ekstraksi posisi acak akan menggunakan sequential untuk sementara")
-                # Implementasi full random extraction bisa ditambahkan nanti
-                secret_bits = self._extract_bits_sequential(n_lsb, data_start_sample, data_bits_needed)
+                secret_bits = self._extract_bits_random(n_lsb, data_start_sample, 
+                                            data_bits_needed, stego_key)
             else:
                 secret_bits = self._extract_bits_sequential(n_lsb, data_start_sample, data_bits_needed)
             
