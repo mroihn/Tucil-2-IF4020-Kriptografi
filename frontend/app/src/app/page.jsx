@@ -17,7 +17,6 @@ const AudioSteganographyApp = () => {
   const [stegoKey, setStegoKey] = useState('');
   const [extractedMessage, setExtractedMessage] = useState(null);
   const [showKey, setShowKey] = useState(false);
-  const [fileName, setFileName] = useState('');
 
   const coverAudioRef = useRef(null);
   const stegoAudioRef = useRef(null);
@@ -91,7 +90,7 @@ const AudioSteganographyApp = () => {
       const extractedUrl = `http://localhost:8000/${data.file}`;
       const response = await fetch(extractedUrl);
       const blob = await response.blob();
-      const downloadName = fileName || data.original_name || "extracted_file";
+      const downloadName = data.original_name || "extracted_file";
       const url = URL.createObjectURL(blob);
 
 
@@ -171,17 +170,6 @@ const AudioSteganographyApp = () => {
                         {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                       </button>
                     </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="block text-white font-medium">Output Filename</label>
-                    <input
-                      type="text"
-                      value={fileName}
-                      onChange={(e) => setFileName(e.target.value)}
-                      className="w-full p-3 bg-white/10 border border-white/30 rounded-lg text-white"
-                      placeholder="extracted_message.txt"
-                    />
                   </div>
                 </div>
               </div>
