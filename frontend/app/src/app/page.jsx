@@ -66,31 +66,47 @@ const AudioSteganographyApp = () => {
 
   
 
-  const extractMessage = () => {
+  const extractMessage = async () => {
     if (!stegoAudio || !stegoKey) {
-      alert('Please provide stego audio file and stego key');
+      alert("Please provide stego audio file and stego key");
       return;
     }
 
-    // Simulasi proses ekstraksi
-    setTimeout(() => {
-      const extractedText = "This is a secret message that was hidden in the audio file.";
-      setExtractedMessage({
-        content: extractedText,
-        name: fileName || 'extracted_message.txt'
-      });
-      alert('Message extracted successfully!');
-    }, 1500);
-  };
+    const formData = new FormData();
+    formData.append("stego_file", stegoAudio.file);
+    formData.append("stego_key", stegoKey);
 
-  const downloadFile = (content, filename) => {
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    try {
+      const res = await fetch("http://localhost:8000/extract", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+
+      if (!data.success) {
+        alert("Extraction failed: " + data.error);
+        return;
+      }
+
+      const extractedUrl = `http://localhost:8000/${data.file}`;
+      const response = await fetch(extractedUrl);
+      const blob = await response.blob();
+      const downloadName = fileName || data.original_name || "extracted_file";
+      const url = URL.createObjectURL(blob);
+
+
+      setExtractedMessage({
+        url,
+        blob,
+        name: downloadName,
+        type: blob.type
+      });
+
+      alert("Message extracted successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Extraction request failed");
+    }
   };
 
   return (
@@ -182,20 +198,38 @@ const AudioSteganographyApp = () => {
             {extractedMessage && (
               <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-white">Extracted Message</h3>
-                  <button
-                    onClick={() => downloadFile(extractedMessage.content, extractedMessage.name)}
+                  <h3 className="text-xl font-bold text-white">Extracted File</h3>
+                  <a
+                    href={extractedMessage.url}
+                    download={extractedMessage.name}
                     className="flex items-center space-x-2 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
                   >
                     <Download className="w-4 h-4" />
                     <span>Download</span>
-                  </button>
+                  </a>
                 </div>
+
+                {/* Preview section */}
                 <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                  <pre className="text-white whitespace-pre-wrap">{extractedMessage.content}</pre>
+                  {extractedMessage.type.startsWith("text/") ? (
+                    <pre className="text-white whitespace-pre-wrap">
+                      {extractedMessage.content}
+                    </pre>
+                  ) : extractedMessage.type.startsWith("image/") ? (
+                    <img
+                      src={extractedMessage.url}
+                      alt={extractedMessage.name}
+                      className="max-w-full rounded-lg border border-white/20"
+                    />
+                  ) : (
+                    <p className="text-gray-300">
+                      File ready for download: <strong>{extractedMessage.name}</strong>
+                    </p>
+                  )}
                 </div>
               </div>
             )}
+
           </div>
         )}
       </div>

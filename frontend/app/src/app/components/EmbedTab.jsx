@@ -15,31 +15,47 @@ const EmbedTab = ({}) => {
   const coverAudioRef = useRef(null);
   const stegoAudioRef = useRef(null);
   
-  const embedMessage = () => {
+  const embedMessage = async () => {
     if (!coverAudio || !secretMessage || !stegoKey) {
-      alert('Please provide all required files and stego key');
+      alert("Please provide all required files and stego key");
       return;
     }
 
-    // Simulasi proses embedding
-    setTimeout(() => {
-      const stegoUrl = coverAudio.url; // Dalam implementasi nyata, ini akan menjadi audio hasil steganografi
-      setStegoAudio({
-        file: coverAudio.file,
-        url: stegoUrl,
-        name: `stego_${coverAudio.name}`
+    const formData = new FormData();
+    formData.append("cover_file", coverAudio.file);
+    formData.append("secret_file", secretMessage.file);
+    formData.append("stego_key", stegoKey);
+    formData.append("n_lsb", nLSB);
+    formData.append("use_encryption", useEncryption);
+    formData.append("use_random", useRandomStart);
+
+    try {
+      const res = await fetch("http://localhost:8000/embed", {
+        method: "POST",
+        body: formData,
       });
-      calculatePSNR();
-      alert('Message embedded successfully!');
-    }, 2000);
+      const data = await res.json();
+
+      if (!data.success) {
+        alert("Embedding failed: " + data.error);
+        return;
+      }
+
+      const stegoUrl = `http://localhost:8000/${data.embed_file}`;
+      setStegoAudio({
+        url: stegoUrl,
+        name: data.embed_file.split("/").pop(),
+      });
+
+      setPsnr(data.psnr_score?.toFixed(2));
+      alert("Message embedded successfully!");
+    } catch (err) {
+      console.error(err);
+      alert("Embedding request failed");
+    }
   };
 
-  const calculatePSNR = () => {
-    // Simulasi perhitungan PSNR
-    // Dalam implementasi nyata, ini akan menggunakan data audio yang sesungguhnya
-    const simulatedPSNR = 35 + Math.random() * 20;
-    setPsnr(simulatedPSNR.toFixed(2));
-  };
+
   const handleFileUpload = (file, type) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -95,15 +111,14 @@ const EmbedTab = ({}) => {
             <div className="border-2 border-dashed border-white/30 rounded-xl p-6 text-center hover:border-blue-400 transition-colors">
               <input
                 type="file"
-                accept=".txt"
+                accept="*/*"
                 onChange={(e) => handleFileUpload(e.target.files[0], 'secret')}
                 className="hidden"
                 id="secret-upload"
               />
               <label htmlFor="secret-upload" className="cursor-pointer">
                 <Upload className="w-12 h-12 text-purple-300 mx-auto mb-4" />
-                <p className="text-white mb-2">Click to upload secret message</p>
-                <p className="text-purple-200 text-sm">Text files only</p>
+                <p className="text-white mb-2">Click to upload secret file</p>
               </label>
               {secretMessage && (
                 <p className="text-green-300 mt-2">✓ {secretMessage.name}</p>
@@ -184,7 +199,6 @@ const EmbedTab = ({}) => {
           Embed Message
         </button>
         {stegoAudio && <MediaPlayer label="Stego Audio" audio={stegoAudio} audioRef={stegoAudioRef} />}
-        {<MediaPlayer label="Stego Audio" audio={stegoAudio} audioRef={stegoAudioRef} />}
 
       </div>
 

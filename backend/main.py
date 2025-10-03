@@ -13,12 +13,18 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from pathlib import Path
+from fastapi.staticfiles import StaticFiles
 
 import uvicorn
 
 from script import VigenereCipher, RandomPositionGenerator, AudioSteganography
 
+BASE_DIR = Path(__file__).resolve().parent
+UPLOAD_DIR = BASE_DIR / "uploads"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 app = FastAPI(title="Audio Steganography API")
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # Allow CORS (optional)
 app.add_middleware(
@@ -29,9 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-BASE_DIR = Path(__file__).resolve().parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
 
 
 def save_uploaded_file(upload: StarletteUploadFile, subdir: str = "") -> str:
