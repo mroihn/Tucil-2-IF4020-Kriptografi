@@ -1,10 +1,5 @@
 import base64
 import os
-import time
-import struct
-import json
-import hashlib
-import random
 from typing import Optional
 
 import numpy as np
@@ -18,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 import uvicorn
 
-from script import VigenereCipher, RandomPositionGenerator, AudioSteganography
+from script import  AudioSteganography
 
 BASE_DIR = Path(__file__).resolve().parent
 UPLOAD_DIR = BASE_DIR / "uploads"
