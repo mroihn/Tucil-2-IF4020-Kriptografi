@@ -41,5 +41,31 @@ python-multipart>=0.0.6
 - **Python 3.8+**
 
 
+## Cara Menjalankan Program
+
+### 1. Jalankan Backend (API)
+```bash
+cd backend
+python main.py
+```
+Pastikan semua dependensi Python sudah terinstall (`pip install -r requirements.txt`), dan FFmpeg sudah tersedia di PATH.
+
+### 2. Jalankan Frontend (Development Mode)
+```bash
+cd frontend/app
+npm install
+npm run dev
+```
+Frontend  dapat diakses pada `localhost:3000` secara default.
+
+### 3. Struktur Folder
+- `backend/` : API FastAPI & logika steganografi audio
+- `frontend/app/` : Web app Next.js untuk antarmuka pengguna
+- `demo_files/` : Contoh file audio dan file rahasia
+
 ## How To Use
 
+1. Upload file audio dan file rahasia melalui web frontend.
+2. Pilih jumlah LSB dan masukkan seed untuk random positioning (optional).
+3. Jalankan proses embedding/extraction melalui interface.
+4. Cek hasil dan evaluasi kualitas audio dengan PSNR.
