@@ -1,3 +1,4 @@
+import base64
 import os
 import time
 import struct
@@ -42,10 +43,10 @@ def save_uploaded_file(upload: StarletteUploadFile, subdir: str = "") -> str:
     subdir_path = UPLOAD_DIR / subdir
     subdir_path.mkdir(parents=True, exist_ok=True)
     
-    if subdir == "secrets":
-        filename = upload.filename
-    else:
-        filename = f"{int(time.time()*1000)}_{upload.filename}"
+    filename = upload.filename
+    # if subdir == "secrets":
+    # else:
+    #     filename = f"{int(time.time()*1000)}_{upload.filename}"
     file_path = subdir_path / filename
     with open(file_path, "wb") as f:
         f.write(upload.file.read())
@@ -98,7 +99,13 @@ async def api_embed(
     use_encryption: bool = Form(False),
     use_random: bool = Form(False)
 ):
+    cover_path = None
+    secret_path = None
+    wav_path = None
+    mp3_path = None
+
     try:
+        # --- Save uploads ---
         cover_path = save_uploaded_file(cover_file, subdir="covers")
         secret_path = save_uploaded_file(secret_file, subdir="secrets")
 
@@ -111,11 +118,12 @@ async def api_embed(
         use_encryption = parse_bool(use_encryption)
         use_random = parse_bool(use_random)
 
-        # --- Output file has same name as cover file ---
-        cover_name = os.path.basename(cover_path)
-        ext = os.path.splitext(cover_name)[1].lower() or ".wav"
-        out_path = UPLOAD_DIR / "stego" / cover_name
-        out_path.parent.mkdir(parents=True, exist_ok=True)
+        # --- Prepare output filenames ---
+        cover_name = os.path.splitext(os.path.basename(cover_path))[0]
+        wav_path = UPLOAD_DIR / "stego" / f"{cover_name}_stego.wav"
+        mp3_path = UPLOAD_DIR / "stego" / f"{cover_name}.mp3"
+        wav_path.parent.mkdir(parents=True, exist_ok=True)
+        mp3_path.parent.mkdir(parents=True, exist_ok=True)
 
         # --- Load and embed ---
         stego = AudioSteganography()
@@ -130,28 +138,45 @@ async def api_embed(
                 status_code=400,
             )
 
-        ok = stego.embed_message(secret_path, str(out_path), stego_key, 
+        ok = stego.embed_message(secret_path, str(mp3_path), stego_key, 
                                  n_lsb=n_lsb, use_encryption=use_encryption, use_random=use_random)
         if not ok:
             return JSONResponse({"success": False, "error": "Embedding failed"}, status_code=500)
 
-        # --- Delete secret file after embedding ---
-        try:
-            os.remove(secret_path)
-        except Exception as cleanup_err:
-            print(f"Warning: could not delete secret file {secret_path}: {cleanup_err}")
+        with open(wav_path, "rb") as f:
+            wav_b64 = base64.b64encode(f.read()).decode("utf-8")
+
+        with open(mp3_path, "rb") as f:
+            mp3_b64 = base64.b64encode(f.read()).decode("utf-8")
+
 
         # --- Compute PSNR and return ---
-        psnr = compute_psnr_from_files(cover_path, str(out_path))
-        rel_path = os.path.relpath(out_path, start=BASE_DIR)
+        psnr_wav = compute_psnr_from_files(cover_path, str(wav_path))
+        psnr_mp3 = compute_psnr_from_files(cover_path, str(mp3_path))
+        psnr = {"wav": psnr_wav, "mp3": psnr_mp3}
 
-        return {"success": True, "embed_file": rel_path, "psnr_score": psnr}
+
+        return {
+            "success": True,
+            "wav_file": wav_b64,
+            "mp3_file": mp3_b64,
+            "file_name": cover_name,
+            "psnr_score": psnr
+        }
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return JSONResponse({"success": False, "error": str(e)}, status_code=500)
 
+    finally:
+        # --- Cleanup temp files ---
+        for path in [cover_path, secret_path, wav_path, mp3_path]:
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception as cleanup_err:
+                    print(f"Warning: could not delete {path}: {cleanup_err}")
 @app.post("/extract")
 async def api_extract(
     stego_file: UploadFile = File(...),

@@ -8,7 +8,8 @@ const EmbedTab = ({ embedState, setEmbedState }) => {
   const updateState = (updates) => setEmbedState((prev) => ({ ...prev, ...updates }));
 
   const coverAudioRef = useRef(null);
-  const stegoAudioRef = useRef(null);
+  const WavStegoAudioRef = useRef(null);
+  const Mp3StegoAudioRef = useRef(null);
   const [loading, setLoading] = useState(false);
 
   const embedMessage = async () => {
@@ -38,10 +39,27 @@ const EmbedTab = ({ embedState, setEmbedState }) => {
         return;
       }
 
-      const stegoUrl = `http://localhost:8000/${data.embed_file}`;
-      updateState({ stegoAudio: { url: stegoUrl, name: data.embed_file.split("/").pop() } });
+      // Convert Base64 back to Blob URLs
+      const wavBlob = data.wav_file ? new Blob(
+        [Uint8Array.from(atob(data.wav_file), c => c.charCodeAt(0))],
+        { type: "audio/wav" }
+      ) : null;
 
-      updateState({ psnr: data.psnr_score?.toFixed(2) });
+      const mp3Blob = data.mp3_file ? new Blob(
+        [Uint8Array.from(atob(data.mp3_file), c => c.charCodeAt(0))],
+        { type: "audio/mpeg" }
+      ) : null;
+
+      updateState({
+        stegoAudio: {
+          wav: wavBlob ? { url: URL.createObjectURL(wavBlob), blob: wavBlob, name: data.file_name + "_stego.wav" } : null,
+          mp3: mp3Blob ? { url: URL.createObjectURL(mp3Blob), blob: mp3Blob, name: data.file_name + "_stego.mp3" } : null,
+        },
+        psnr: {
+          wav: data.psnr_score?.wav?.toFixed(2),
+          mp3: data.psnr_score?.mp3?.toFixed(2)
+        }
+      });
       alert("Message embedded successfully!");
     } catch (err) {
       console.error(err);
@@ -200,43 +218,84 @@ const EmbedTab = ({ embedState, setEmbedState }) => {
           {loading ? "Embedding..." : "Embed Message"}
         </button>
         {stegoAudio && (
-          <div className="flex flex-col items-center gap-2">
-            <MediaPlayer label="Stego Audio" audio={stegoAudio} audioRef={stegoAudioRef} />
-            
-            {/* Download button */}
-            <a
-              href={stegoAudio.url}
-              download={stegoAudio.name || "stego_audio.wav"}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
-            >
-              Download Stego Audio
-            </a>
+          <div className="flex flex-col gap-4">
+            {/* WAV (always returned) */}
+              <MediaPlayer 
+                label="Stego WAV (Lossless, use for extraction)" 
+                audio={stegoAudio.wav} 
+                audioRef={WavStegoAudioRef} 
+              />
+              <a 
+                href={stegoAudio.wav.url} 
+                download={stegoAudio.wav.name} 
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download WAV</span>
+              </a>
+
+            {/* MP3 (optional, only if backend encoded it) */}
+              <MediaPlayer 
+                label="Stego MP3 (distribution, may lose stego bits)" 
+                audio={stegoAudio.mp3} 
+                audioRef={Mp3StegoAudioRef} 
+              />
+              <a 
+                href={stegoAudio.mp3.url} 
+                download={stegoAudio.mp3.name}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+              >
+                <Download className="w-4 h-4" />
+                <span>Download MP3</span>
+              </a>
           </div>
         )}
       </div>
+      
 
       {/* PSNR Display */}
-      {psnr && (
-        <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
-          <h3 className="text-xl font-bold text-white mb-4 flex items-center">
-            <Calculator className="w-5 h-5 mr-3" />
-            Audio Quality Analysis
-          </h3>
-          <div className="flex items-center justify-between">
+     {psnr && (
+      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-6 border border-white/20">
+        <h3 className="text-xl font-bold text-white mb-4 flex items-center">
+          <Calculator className="w-5 h-5 mr-3" />
+          Audio Quality Analysis
+        </h3>
+        
+        {/* WAV Quality */}
+        {psnr.wav && (
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-white/80">Peak Signal-to-Noise Ratio (PSNR)</p>
-              <p className="text-3xl font-bold text-white">{psnr} dB</p>
+              <p className="text-white/80">PSNR (WAV)</p>
+              <p className="text-3xl font-bold text-white">{psnr.wav} dB</p>
             </div>
             <div className={`px-4 py-2 rounded-full ${
-              parseFloat(psnr) >= 30 
+              parseFloat(psnr.wav) >= 30 
                 ? 'bg-green-500/20 text-green-300' 
                 : 'bg-red-500/20 text-red-300'
             }`}>
-              {parseFloat(psnr) >= 30 ? 'Good Quality' : 'Quality Degraded'}
+              {parseFloat(psnr.wav) >= 30 ? 'Good Quality' : 'Quality Degraded'}
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* MP3 Quality */}
+        {psnr.mp3 && (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-white/80">PSNR (MP3)</p>
+              <p className="text-3xl font-bold text-white">{psnr.mp3} dB</p>
+            </div>
+            <div className={`px-4 py-2 rounded-full ${
+              parseFloat(psnr.mp3) >= 30 
+                ? 'bg-green-500/20 text-green-300' 
+                : 'bg-red-500/20 text-red-300'
+            }`}>
+              {parseFloat(psnr.mp3) >= 30 ? 'Good Quality' : 'Quality Degraded'}
+            </div>
+          </div>
+        )}
+      </div>
+    )}
     </div>
   );
 };
