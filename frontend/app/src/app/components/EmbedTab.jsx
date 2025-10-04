@@ -69,6 +69,23 @@ const EmbedTab = ({ embedState, setEmbedState }) => {
     }
   };
 
+  function getPsnrLabel(value) {
+    if (value === "inf") return "Identik (Perfect)";
+    const psnr = parseFloat(value);
+    if (psnr < 30) return "⚠ Signifikan";
+    if (psnr < 40) return "Baik";
+    if (psnr < 50) return "Sangat Baik";
+    return "Excellent";
+  }
+
+  function getPsnrClass(value) {
+    if (value === "inf") return "bg-green-500/20 text-green-300";
+    const psnr = parseFloat(value);
+    if (psnr < 30) return "bg-red-500/20 text-red-300";
+    if (psnr < 40) return "bg-yellow-500/20 text-yellow-300";
+    if (psnr < 50) return "bg-blue-500/20 text-blue-300";
+    return "bg-green-500/20 text-green-300";
+  }
 
   const handleFileUpload = (file, type) => {
     const reader = new FileReader();
@@ -265,32 +282,13 @@ const EmbedTab = ({ embedState, setEmbedState }) => {
         {psnr.wav && (
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-white/80">PSNR (WAV)</p>
-              <p className="text-3xl font-bold text-white">{psnr.wav} dB</p>
+              <p className="text-white/80">WAV PSNR</p>
+              <p className="text-3xl font-bold text-white">
+                {psnr.wav === "inf" ? "∞" : `${parseFloat(psnr.wav).toFixed(2)} dB`}
+              </p>
             </div>
-            <div className={`px-4 py-2 rounded-full ${
-              parseFloat(psnr.wav) >= 30 
-                ? 'bg-green-500/20 text-green-300' 
-                : 'bg-red-500/20 text-red-300'
-            }`}>
-              {parseFloat(psnr.wav) >= 30 ? 'Good Quality' : 'Quality Degraded'}
-            </div>
-          </div>
-        )}
-
-        {/* MP3 Quality */}
-        {psnr.mp3 && (
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-white/80">PSNR (MP3)</p>
-              <p className="text-3xl font-bold text-white">{psnr.mp3} dB</p>
-            </div>
-            <div className={`px-4 py-2 rounded-full ${
-              parseFloat(psnr.mp3) >= 30 
-                ? 'bg-green-500/20 text-green-300' 
-                : 'bg-red-500/20 text-red-300'
-            }`}>
-              {parseFloat(psnr.mp3) >= 30 ? 'Good Quality' : 'Quality Degraded'}
+            <div className={`px-4 py-2 rounded-full ${getPsnrClass(psnr.wav)}`}>
+              {getPsnrLabel(psnr.wav)}
             </div>
           </div>
         )}
