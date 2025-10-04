@@ -2,19 +2,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, Play, Pause, Download, FileAudio, Lock, Unlock, Settings, Calculator, Eye, EyeOff } from 'lucide-react';
 import MediaPlayer from './MediaPlayer';
-const EmbedTab = ({}) => {
-  const [useEncryption, setUseEncryption] = useState(false);
-  const [useRandomStart, setUseRandomStart] = useState(false);
-  const [nLSB, setNLSB] = useState(1);
-  const [psnr, setPsnr] = useState(null);
-  const [coverAudio, setCoverAudio] = useState(null);
-  const [stegoAudio, setStegoAudio] = useState(null);
-  const [secretMessage, setSecretMessage] = useState(null);
-  const [showKey, setShowKey] = useState(false);
-  const [stegoKey, setStegoKey] = useState('');
+const EmbedTab = ({ embedState, setEmbedState }) => {
+  const { useEncryption, useRandomStart, nLSB, psnr, coverAudio, stegoAudio, secretMessage, showKey, stegoKey } = embedState;
+
+  const updateState = (updates) => setEmbedState((prev) => ({ ...prev, ...updates }));
+
   const coverAudioRef = useRef(null);
   const stegoAudioRef = useRef(null);
-  
+  const [loading, setLoading] = useState(false);
+
   const embedMessage = async () => {
     if (!coverAudio || !secretMessage || !stegoKey) {
       alert("Please provide all required files and stego key");
@@ -30,6 +26,7 @@ const EmbedTab = ({}) => {
     formData.append("use_random", useRandomStart);
 
     try {
+      setLoading(true);
       const res = await fetch("http://localhost:8000/embed", {
         method: "POST",
         body: formData,
@@ -42,16 +39,15 @@ const EmbedTab = ({}) => {
       }
 
       const stegoUrl = `http://localhost:8000/${data.embed_file}`;
-      setStegoAudio({
-        url: stegoUrl,
-        name: data.embed_file.split("/").pop(),
-      });
+      updateState({ stegoAudio: { url: stegoUrl, name: data.embed_file.split("/").pop() } });
 
-      setPsnr(data.psnr_score?.toFixed(2));
+      updateState({ psnr: data.psnr_score?.toFixed(2) });
       alert("Message embedded successfully!");
     } catch (err) {
       console.error(err);
       alert("Embedding request failed");
+    } finally{
+      setLoading(false);
     }
   };
 
@@ -61,11 +57,11 @@ const EmbedTab = ({}) => {
     reader.onload = (e) => {
       const audioUrl = URL.createObjectURL(file);
       if (type === 'cover') {
-        setCoverAudio({ file, url: audioUrl, name: file.name });
+        updateState ({ coverAudio: ({ file, url: audioUrl, name: file.name })});
       } else if (type === 'secret') {
-        setSecretMessage({ file, content: e.target.result, name: file.name });
+        updateState ({ secretMessage: ({ file, content: e.target.result, name: file.name })});
       } else if (type === 'stego') {
-        setStegoAudio({ file, url: audioUrl, name: file.name });
+        updateState ({ stegoAudio: ({ file, url: audioUrl, name: file.name })});
       }
     };
     
@@ -132,7 +128,7 @@ const EmbedTab = ({}) => {
           <div className="space-y-2">
             <label className="block text-white font-medium">Use Encryption</label>
             <button
-              onClick={() => setUseEncryption(!useEncryption)}
+              onClick={() => updateState({ useEncryption: !useEncryption })}
               className={`w-full p-3 rounded-lg border transition-colors ${
                 useEncryption
                   ? 'bg-green-500/20 border-green-400 text-green-300'
@@ -147,7 +143,7 @@ const EmbedTab = ({}) => {
           <div className="space-y-2">
             <label className="block text-white font-medium">Random Start Point</label>
             <button
-              onClick={() => setUseRandomStart(!useRandomStart)}
+              onClick={() => updateState({ useRandomStart: (!useRandomStart)})}
               className={`w-full p-3 rounded-lg border transition-colors ${
                 useRandomStart
                   ? 'bg-blue-500/20 border-blue-400 text-blue-300'
@@ -163,10 +159,10 @@ const EmbedTab = ({}) => {
             <label className="block text-white font-medium">n-LSB</label>
             <select
               value={nLSB}
-              onChange={(e) => setNLSB(parseInt(e.target.value))}
+              onChange={(e) => updateState({ nLSB: parseInt(e.target.value) })}
               className="w-full p-3 bg-white/10 border border-white/30 rounded-lg text-white"
             >
-              {[1, 2, 3, 4, 5, 6, 7, 8].map(n => (
+              {[1, 2, 3, 4].map(n => (
                 <option key={n} value={n} className="bg-slate-800">{n} LSB</option>
               ))}
             </select>
@@ -178,12 +174,12 @@ const EmbedTab = ({}) => {
               <input
                 type={showKey ? 'text' : 'password'}
                 value={stegoKey}
-                onChange={(e) => setStegoKey(e.target.value)}
+                onChange={(e) => updateState({ stegoKey: e.target.value })}
                 className="w-full p-3 bg-white/10 border border-white/30 rounded-lg text-white pr-10"
                 placeholder="Enter key"
               />
               <button
-                onClick={() => setShowKey(!showKey)}
+                onClick={() => updateState({ showKey: (!showKey)})}
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60"
               >
                 {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -194,12 +190,29 @@ const EmbedTab = ({}) => {
 
         <button
           onClick={embedMessage}
-          className="w-full mt-8 bg-gradient-to-r from-blue-500 to-purple-600 text-white py-4 px-8 rounded-xl font-semibold text-lg hover:from-blue-600 hover:to-purple-700 transition-all transform hover:scale-105 shadow-lg"
+          disabled={loading}
+          className={`w-full mt-8 py-4 px-8 rounded-xl font-semibold text-lg shadow-lg transition-all transform ${
+            loading
+              ? "bg-gray-500 cursor-not-allowed"
+              : "bg-gradient-to-r from-blue-500 to-purple-600 text-white hover:from-blue-600 hover:to-purple-700 hover:scale-105"
+          }`}
         >
-          Embed Message
+          {loading ? "Embedding..." : "Embed Message"}
         </button>
-        {stegoAudio && <MediaPlayer label="Stego Audio" audio={stegoAudio} audioRef={stegoAudioRef} />}
-
+        {stegoAudio && (
+          <div className="flex flex-col items-center gap-2">
+            <MediaPlayer label="Stego Audio" audio={stegoAudio} audioRef={stegoAudioRef} />
+            
+            {/* Download button */}
+            <a
+              href={stegoAudio.url}
+              download={stegoAudio.name || "stego_audio.wav"}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg shadow hover:bg-blue-700 transition"
+            >
+              Download Stego Audio
+            </a>
+          </div>
+        )}
       </div>
 
       {/* PSNR Display */}

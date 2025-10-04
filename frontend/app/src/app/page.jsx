@@ -5,6 +5,17 @@ import Header  from './components/Header';
 import EmbedTab from './components/EmbedTab';
 
 const AudioSteganographyApp = () => {
+  const [embedState, setEmbedState] = useState({
+  useEncryption: false,
+  useRandomStart: false,
+  nLSB: 1,
+  psnr: null,
+  coverAudio: null,
+  stegoAudio: null,
+  secretMessage: null,
+  showKey: false,
+  stegoKey: "",
+});
   const [activeTab, setActiveTab] = useState('embed');
   const [coverAudio, setCoverAudio] = useState(null);
   const [secretMessage, setSecretMessage] = useState(null);
@@ -116,7 +127,7 @@ const AudioSteganographyApp = () => {
       <div className="max-w-7xl mx-auto px-6 py-8">
         {/* Embed Message Tab */}
         {activeTab === 'embed' && (
-          <EmbedTab />
+          <EmbedTab embedState={embedState} setEmbedState={setEmbedState} />
         )}
 
         {/* Extract Message Tab */}

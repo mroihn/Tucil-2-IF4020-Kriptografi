@@ -41,7 +41,11 @@ app.add_middleware(
 def save_uploaded_file(upload: StarletteUploadFile, subdir: str = "") -> str:
     subdir_path = UPLOAD_DIR / subdir
     subdir_path.mkdir(parents=True, exist_ok=True)
-    filename = f"{int(time.time()*1000)}_{upload.filename}"
+    
+    if subdir == "secrets":
+        filename = upload.filename
+    else:
+        filename = f"{int(time.time()*1000)}_{upload.filename}"
     file_path = subdir_path / filename
     with open(file_path, "wb") as f:
         f.write(upload.file.read())
@@ -168,7 +172,7 @@ async def api_extract(
             return JSONResponse({"success": False, "error": "Extraction failed"}, status_code=400)
 
         rel_path = os.path.relpath(out_path, start=BASE_DIR)
-        return {"success": True, "file": rel_path}
+        return {"success": True, "file": rel_path, "original_name": os.path.basename(rel_path)}
 
     except Exception as e:
         import traceback

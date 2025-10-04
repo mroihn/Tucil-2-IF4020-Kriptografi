@@ -607,7 +607,7 @@ class AudioSteganography:
             original_name = metadata.get("original_name", "file_terekstrak")
             original_name, _ = os.path.splitext(original_name)
             original_ext = metadata.get("extension", "")
-            out_name = f"{original_name}_extracted{original_ext}"
+            out_name = f"{original_name}{original_ext}"
             out_path = Path("uploads/extracted") / out_name
             out_path.parent.mkdir(parents=True, exist_ok=True)
             
