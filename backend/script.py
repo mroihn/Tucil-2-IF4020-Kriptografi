@@ -630,45 +630,127 @@ class AudioSteganography:
             traceback.print_exc()
             return False
     
-    def calculate_psnr(self, original_audio_path: str) -> Optional[float]:
-        """Hitung PSNR antara audio asli dan hasil steganografi"""
+    def calculate_psnr(self, original_audio_path: str, stego_audio_path: str) -> Optional[float]:
+        temp_files = []  # Track temporary files untuk cleanup
+        
         try:
-            # Load audio asli
+            # Validasi file exists
             if not os.path.exists(original_audio_path):
                 print(f"✗ File asli tidak ditemukan: {original_audio_path}")
                 return None
+            
+            if not os.path.exists(stego_audio_path):
+                print(f"✗ File stego tidak ditemukan: {stego_audio_path}")
+                return None
+            
+            print("Mempersiapkan file untuk perhitungan PSNR...")
+            
+            # Helper function untuk convert ke WAV jika diperlukan
+            def ensure_wav(file_path):
+                ext = os.path.splitext(file_path)[1].lower()
                 
-            original_audio = AudioSegment.from_mp3(original_audio_path)
-            original_data = np.array(original_audio.get_array_of_samples(), dtype=np.int16)
+                if ext == '.wav':
+                    print(f"✓ {os.path.basename(file_path)} sudah format WAV")
+                    return file_path, False  # Return path dan flag bukan temporary
+                
+                # Bukan WAV, perlu konversi
+                print(f"⚠ {os.path.basename(file_path)} bukan WAV, converting ke PCM...")
+                
+                # Load audio
+                if ext == '.mp3':
+                    audio = AudioSegment.from_mp3(file_path)
+                elif ext == '.flac':
+                    audio = AudioSegment.from_file(file_path, format="flac")
+                elif ext == '.ogg':
+                    audio = AudioSegment.from_ogg(file_path)
+                else:
+                    audio = AudioSegment.from_file(file_path)
+                
+                # Buat temporary WAV file
+                import tempfile
+                temp_fd, temp_path = tempfile.mkstemp(suffix='.wav', prefix='psnr_temp_')
+                os.close(temp_fd)
+                
+                # Export ke WAV (PCM)
+                audio.export(temp_path, format="wav")
+                print(f"✓ Converted ke: {temp_path}")
+                
+                return temp_path, True  # Return path dan flag adalah temporary
             
+            # Ensure kedua file adalah WAV
+            original_wav_path, original_is_temp = ensure_wav(original_audio_path)
+            stego_wav_path, stego_is_temp = ensure_wav(stego_audio_path)
+            
+            # Track temporary files untuk cleanup
+            if original_is_temp:
+                temp_files.append(original_wav_path)
+            if stego_is_temp:
+                temp_files.append(stego_wav_path)
+            
+            print("\n" + "="*50)
+            print("Menghitung PSNR pada data PCM (WAV)...")
+            print("="*50)
+            
+            # Load audio WAV (x[n] dan y[n])
+            original_audio = AudioSegment.from_wav(original_wav_path)
+            stego_audio = AudioSegment.from_wav(stego_wav_path)
+            
+            # Konversi ke numpy array (16-bit PCM)
+            x = np.array(original_audio.get_array_of_samples(), dtype=np.int16)
+            y = np.array(stego_audio.get_array_of_samples(), dtype=np.int16)
+            
+            # Info channel
+            print(f"✓ Audio asli: {original_audio.channels} channel(s), {original_audio.frame_rate} Hz")
+            print(f"✓ Audio stego: {stego_audio.channels} channel(s), {stego_audio.frame_rate} Hz")
+            
+            # Flatten jika stereo
             if original_audio.channels == 2:
-                original_data = original_data.reshape(-1, 2)
+                x = x.reshape(-1, 2).flatten()
+            if stego_audio.channels == 2:
+                y = y.reshape(-1, 2).flatten()
             
-            # Pastikan bentuk array sama
-            if original_data.shape != self.audio_data.shape:
-                # Resize jika perlu
-                min_samples = min(original_data.size, self.audio_data.size)
-                original_data = original_data.flatten()[:min_samples]
-                stego_data = self.audio_data.flatten()[:min_samples]
-            else:
-                original_data = original_data.flatten()
-                stego_data = self.audio_data.flatten()
+            # Align jumlah sampel (ambil minimum)
+            N = min(len(x), len(y))
+            x = x[:N]
+            y = y[:N]
             
-            # Hitung MSE
-            mse = np.mean((original_data.astype(np.float64) - stego_data.astype(np.float64)) ** 2)
+            print(f"✓ Jumlah sampel ter-align (N): {N:,}")
             
+            # Hitung MSE = (1/N) * Σ(x[n] - y[n])²
+            differences = x.astype(np.float64) - y.astype(np.float64)
+            squared_diff = differences ** 2
+            mse = np.sum(squared_diff) / N
+            
+            print(f"✓ MSE: {mse:.6f}")
+            
+            # Jika MSE = 0, audio identik (PSNR = infinity)
             if mse == 0:
+                print("✓ MSE = 0, audio PCM identik!")
                 return float('inf')
             
-            # Hitung PSNR
-            max_value = 2**15 - 1  # Untuk 16-bit audio signed
-            psnr = 20 * np.log10(max_value / np.sqrt(mse))
+            # MAX untuk 16-bit PCM signed
+            MAX = 32767.0
+            
+            # Hitung PSNR = 10 * log10(MAX² / MSE)
+            psnr = 10 * np.log10((MAX ** 2) / mse)
             
             return psnr
             
         except Exception as e:
             print(f"✗ Error calculating PSNR: {e}")
+            import traceback
+            traceback.print_exc()
             return None
+        
+        finally:
+            # Cleanup temporary WAV files
+            for temp_file in temp_files:
+                try:
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+                        print(f"✓ Cleanup: {temp_file}")
+                except Exception as e:
+                    print(f"⚠ Warning: Gagal hapus temporary file {temp_file}: {e}")
 
 
 def main():

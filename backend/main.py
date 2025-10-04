@@ -57,34 +57,6 @@ def parse_bool(value) -> bool:
     return v in ("1", "true", "yes", "y")
 
 
-def compute_psnr_from_files(original_path: str, stego_path: str) -> Optional[float]:
-    try:
-        orig = AudioSegment.from_file(original_path)
-        stego = AudioSegment.from_file(stego_path)
-        orig_arr = np.array(orig.get_array_of_samples(), dtype=np.int16)
-        stego_arr = np.array(stego.get_array_of_samples(), dtype=np.int16)
-        if orig.channels == 2:
-            orig_arr = orig_arr.reshape(-1, 2)
-        if stego.channels == 2:
-            stego_arr = stego_arr.reshape(-1, 2)
-        orig_flat = orig_arr.flatten()
-        stego_flat = stego_arr.flatten()
-        min_len = min(orig_flat.size, stego_flat.size)
-        if min_len == 0:
-            return None
-        orig_flat = orig_flat[:min_len].astype(np.float64)
-        stego_flat = stego_flat[:min_len].astype(np.float64)
-        mse = np.mean((orig_flat - stego_flat) ** 2)
-        if mse == 0:
-            return float("inf")
-        max_val = 2**15 - 1
-        psnr = 20 * np.log10(max_val / np.sqrt(mse))
-        return float(psnr)
-    except Exception as e:
-        print("PSNR calc error:", e)
-        return None
-
-
 @app.post("/embed")
 async def api_embed(
     cover_file: UploadFile = File(...),
@@ -146,8 +118,9 @@ async def api_embed(
 
 
         # --- Compute PSNR and return ---
-        psnr_wav = compute_psnr_from_files(cover_path, str(wav_path))
-        psnr_mp3 = compute_psnr_from_files(cover_path, str(mp3_path))
+        psnr = stego.calculate_psnr(cover_path, str(wav_path))
+        psnr_wav = stego.calculate_psnr(cover_path, str(wav_path))
+        psnr_mp3 = stego.calculate_psnr(cover_path, str(mp3_path))
         psnr = {"wav": psnr_wav, "mp3": psnr_mp3}
 
 
