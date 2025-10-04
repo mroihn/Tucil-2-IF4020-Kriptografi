@@ -1,0 +1,10 @@
+{
+    "application": "MP3 Steganography",
+    "version": "1.0",
+    "settings": {
+        "encryption": true,
+        "lsb_bits": 2,
+        "random_position": true
+    },
+    "message": "This JSON file is hidden in audio! 🎵"
+}
